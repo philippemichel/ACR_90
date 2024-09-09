@@ -1,0 +1,160 @@
+---
+subtitle: "Rapport statistique"
+
+---
+```{r}
+#| label: setup
+
+rm(list = ls())
+#
+library(baseph)
+library(janitor)
+library(tidyverse)
+library(gtsummary)
+library(kableExtra)
+library(lubridate)
+library(kableExtra)
+library(forestmodel)
+library(labelled)
+library(epiDisplay)
+library(visdat)
+library(GGally)
+library(ggridges)
+library(colorspace)
+library(xlsx)
+library(apyramid)
+library(plotly)
+#
+theme_gtsummary_language(language = "fr", decimal.mark = ",")
+options(OutDec = ",")
+#
+load(file = "datas/acr90.RData")
+expx <- FALSE
+classeur <- "acr90_1.xls"
+if (expx){system(paste0("rm -f ",classeur))}
+#
+cat <- list(all_continuous() ~ "wilcox.test", all_categorical() ~ "chisq.test")
+affl <- list(all_categorical()~"{n}/{N} ({p})")
+```
+
+
+# Introduction
+
+## Mise en forme des données
+
+- Les variables constantes (la même réponse pour tous les cas) ont été supprimées.
+- Les variables à réponse ouverte ne sont pas exploitables statistiquement donc ont été supprimées
+- La variable `horaire` a été simplifiée en jour/nuit (limites à 8 h & 22 h)
+
+L'échantillon comporte `r nrow(tt)` cas.
+
+## Données manquantes
+
+```{r}
+#| label: fig-manq
+#| fig-cap: Données manquantes
+#| fig-asp: 0.8
+
+vis_dat(tt)
+```
+
+# Description de la population
+
+## Description de l'appel
+
+```{r}
+#| label: tbl-appel1
+#| tbl-cap: Description de l'appel
+
+tt %>%
+  dplyr::select(horaire, motif_appel, ton_appel, horaire, sexe, experience) %>%
+  tbl_summary(missing = "no") |>
+  bold_labels() |>
+  add_n() |>
+  add_ci() |> 
+  modify_header(label ~ " ") |>
+  pexptabph(nomfich = classeur,
+            nomsheet = appel1,
+            exp = expx)
+```
+
+
+## Délais
+
+```{r}
+#| label: tbl-delai1
+#| tbl-cap: Délais
+
+tt %>%
+  dplyr::select(delai, delai_mce) %>%
+  tbl_summary(missing = "no") |>
+  bold_labels() |>
+  add_n() |>
+  modify_header(label ~ "(secondes)") |>
+  pexptabph(nomfich = classeur,
+            nomsheet = delai1,
+            exp = expx)
+```
+
+
+# Objectif principal
+**Temps en secondes entre le décrochage de l’appel et la reconnaissance de
+l’arrêt cardiaque par l’assistant de régulation médicale.**
+
+```{r}
+#| label: tbl-princip1
+#| tbl-cap: Délai
+
+tt %>%
+  dplyr::select(delai) %>%
+  tbl_summary(missing = "no") |>
+  bold_labels() |>
+  add_n() |>
+  modify_header(label ~ "(secondes)") |>
+  pexptabph(nomfich = classeur,
+            nomsheet = delai1,
+            exp = expx)
+```
+
+## Facteurs influants sur le délai
+
+```{r}
+#| label: tbl-princip2
+#| tbl-cap: Facteurs influants sur le délai
+
+tbl_continuous(
+  data = tt,
+  variable = delai,
+  statistic = ~"{mean} ({sd})",
+  include = c(motif_appel, ton_appel,sexe,horaire,sexe,experience )) |> 
+  bold_labels() |>
+    add_p() |> 
+  modify_header(label ~ "(secondes)") |>
+  pexptabph(nomfich = classeur,
+            nomsheet = princip2,
+            exp = expx)
+```
+
+Aucun des facteurs étudiés ne semble influer sur le délai décrochage/ reconnaissance ACR (limite pour l'`horaire`).
+
+## Objectifs secondaires
+
+Les objectifs secondaires sont regroupés dans deux tableaux : un descriptif de la population & de l'appel, l'autre reprenant les délais.
+
+### Objectif 2 & 3
+*Recueil de tout ce qui est dit par le témoin permettant de mettre
+en évidence l’arrêt cardiaque ou rallongeant la détection de l’arrêt cardiaque**
+
+
+
+# Technique 
+
+L'analyse statistique sera réalisée avec le logiciel **R**[@rstat] & divers packages. Outre ceux cités dans le texte ou utilisera en particulier `tidyverse` [@tidy] & `baseph` [@baseph].
+
+Un dépôt GitHub sera utilisé qui ne comprendra que le code & non les données ou résultats. Au besoin un faux tableau de données sera présenté pour permettre des tests.
+
+<https://github.com/philippemichel/acr_90/>
+
+#\printglossary[type=\glsxtrabbrvtype, title={Abbrévations}]
+
+\addcontentsline{toc}{chapter}{Bibliographie}
