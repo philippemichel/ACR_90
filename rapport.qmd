@@ -8,12 +8,10 @@ subtitle: "Rapport statistique"
 rm(list = ls())
 #
 library(baseph)
-library(janitor)
 library(tidyverse)
 library(gtsummary)
 library(kableExtra)
 library(lubridate)
-library(kableExtra)
 library(forestmodel)
 library(labelled)
 library(epiDisplay)
@@ -21,15 +19,16 @@ library(visdat)
 library(GGally)
 library(ggridges)
 library(colorspace)
-library(xlsx)
 library(apyramid)
-library(plotly)
+library(tidytext)
+library(proustr)
+library(ggwordcloud)
 #
 theme_gtsummary_language(language = "fr", decimal.mark = ",")
 options(OutDec = ",")
 #
 load(file = "datas/acr90.RData")
-expx <- FALSE
+expx <- TRUE
 classeur <- "acr90_1.xls"
 if (expx){system(paste0("rm -f ",classeur))}
 #
@@ -44,21 +43,27 @@ affl <- list(all_categorical()~"{n}/{N} ({p})")
 
 - Les variables constantes (la même réponse pour tous les cas) ont été supprimées.
 - Les variables à réponse ouverte ne sont pas exploitables statistiquement donc ont été supprimées
-- La variable `horaire` a été simplifiée en jour/nuit (limites à 8 h & 22 h)
+- Une variable `période` a été créée en discrétisant `horaire` en jour/nuit (limites à 8 h & 22 h)
 
-L'échantillon comporte `r nrow(tt)` cas.
+L'échantillon comporte `r nrow(tt)` cas pour `r ncol(tt)-1` variables.
 
 ## Données manquantes
 
 ```{r}
 #| label: fig-manq
-#| fig-cap: Données manquantes
-#| fig-asp: 0.8
+#| fig-cap: Données manquantes 
+#| fig-asp: 0.6
 
-vis_dat(tt)
+tt %>%
+  dplyr::select(-id) %>%
+vis_dat()
 ```
 
+L'effectif est faible mais l'échantillon comporte très peu de données manquantes. 
+
 # Description de la population
+
+Ces deux tableaux synthétisent la plupart des analyses demandées dans les critères secondaires. 
 
 ## Description de l'appel
 
@@ -66,18 +71,19 @@ vis_dat(tt)
 #| label: tbl-appel1
 #| tbl-cap: Description de l'appel
 
-tt %>%
-  dplyr::select(horaire, motif_appel, ton_appel, horaire, sexe, experience) %>%
+tt |> 
+  dplyr::select(motif_appel, ton_appel, periode, sexe, experience) |>
   tbl_summary(missing = "no") |>
   bold_labels() |>
   add_n() |>
-  add_ci() |> 
+  add_ci() |>
   modify_header(label ~ " ") |>
   pexptabph(nomfich = classeur,
-            nomsheet = appel1,
+            nomsheet = "appel1",
             exp = expx)
 ```
 
+Les intervalles de confiance (`95% IC`) montrent bien  que vu l'effectif, aucune conclusion ne peut être apportée.
 
 ## Délais
 
@@ -85,76 +91,288 @@ tt %>%
 #| label: tbl-delai1
 #| tbl-cap: Délais
 
-tt %>%
-  dplyr::select(delai, delai_mce) %>%
+tt |> 
+  dplyr::select(delai, delai_mce) |> 
   tbl_summary(missing = "no") |>
   bold_labels() |>
   add_n() |>
-  modify_header(label ~ "(secondes)") |>
+  modify_header(label ~ "") |>
+  modify_footnote(all_stat_cols() ~ "Médiane (quartiles) - Temps en secondes") |>
   pexptabph(nomfich = classeur,
-            nomsheet = delai1,
-            exp = expx)
+            nomsheet = "delai1",
+            exp = expx,
+            lg = TRUE)
 ```
 
+
+ 
 
 # Objectif principal
-**Temps en secondes entre le décrochage de l’appel et la reconnaissance de
-l’arrêt cardiaque par l’assistant de régulation médicale.**
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\begin{tcolorbox}[colback=novo!5,
+                  colframe=novo]
+Temps en secondes entre le décrochage de l’appel et la reconnaissance de
+l’arrêt cardiaque par l’assistant de régulation médicale.
+\end{tcolorbox}
+\end{minipage}
+\end{center}
 
 ```{r}
-#| label: tbl-princip1
-#| tbl-cap: Délai
+#| label: tbl-princi1
+#| tbl-cap: Délai décrochage/reconnaissance de l'ACR
 
-tt %>%
-  dplyr::select(delai) %>%
-  tbl_summary(missing = "no") |>
+tt |>
+  dplyr::select(delai) |>
+  tbl_summary(
+    missing = "no",
+    type = all_continuous() ~ "continuous2",
+    statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{mean} ({sd})", "{min}, {max}")
+  ) |>
   bold_labels() |>
-  add_n() |>
-  modify_header(label ~ "(secondes)") |>
+  modify_header(label ~ "") |>
+  modify_footnote(all_stat_cols() ~ "Temps en secondes") |>
   pexptabph(nomfich = classeur,
-            nomsheet = delai1,
+            nomsheet = "delaip1",
             exp = expx)
 ```
 
-## Facteurs influants sur le délai
-
 ```{r}
-#| label: tbl-princip2
-#| tbl-cap: Facteurs influants sur le délai
+#| label: fig-princi1
+#| fig-cap: Délai décrochage/reconnaissance de l'ACR
+#| fig-asp: 0.6
 
-tbl_continuous(
-  data = tt,
-  variable = delai,
-  statistic = ~"{mean} ({sd})",
-  include = c(motif_appel, ton_appel,sexe,horaire,sexe,experience )) |> 
-  bold_labels() |>
-    add_p() |> 
-  modify_header(label ~ "(secondes)") |>
-  pexptabph(nomfich = classeur,
-            nomsheet = princip2,
-            exp = expx)
+tt |>
+  ggplot() +
+  aes(x = delai, y = 1) +
+  geom_violin(fill = 2) +
+  geom_boxplot(width = 0.2, fill = "grey90") +
+  labs(title = "Délai décrochage/reconnaissance de l'ACR", x = "secondes") +
+  theme_light() +
+  scale_fill_discrete_qualitative(palette = "Dark 3") +
+  scale_x_continuous(breaks = seq(0, 180, 30)) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_blank(),
+    legend.position = "none"
+  )
 ```
 
-Aucun des facteurs étudiés ne semble influer sur le délai décrochage/ reconnaissance ACR (limite pour l'`horaire`).
+## Facteurs influants le délai
 
-## Objectifs secondaires
+```{r}
+#| label: tbl-fact1
+#| tbl-cap: Facteurs influants le délai
 
-Les objectifs secondaires sont regroupés dans deux tableaux : un descriptif de la population & de l'appel, l'autre reprenant les délais.
+tt |>
+  tbl_continuous(
+    variable = delai,
+    statistic = everything() ~ "{median} ({p25}, {p75})",
+    include = c(motif_appel, ton_appel, sexe, experience, periode)
+  ) |>
+  bold_labels() |>
+  add_p() |>
+  modify_header(label ~ "secondes") |>
+  pexptabph(
+    nomfich = classeur,
+    nomsheet = "fact1",
+    exp = expx,
+    lg = TRUE
+  )
+```
 
-### Objectif 2 & 3
-*Recueil de tout ce qui est dit par le témoin permettant de mettre
-en évidence l’arrêt cardiaque ou rallongeant la détection de l’arrêt cardiaque**
+Aucun facteur ne semble lié au délai de reconnaissance de l'ACR ce qui, vu le faible effectif, était attendu. la'`période` est limite. 
+
+```{r}
+#| label: fig-periode
+#| fig-cap: Délai décrochage/reconnaissance de l'ACR par période
+#| fig-asp: 0.6
+
+tt |> 
+  ggplot() +
+  aes(x = periode, y = delai, fill = periode) +
+  geom_violin() +
+  geom_boxplot(fill = "grey90", width = 0.2) +
+  labs(
+    title = "Délai décrochage/reconnaissance de l'ACR par période",
+    x = "Période",
+    y = "secondes"
+  ) +
+  theme_light() +
+  scale_fill_discrete_qualitative(palette = "Dark 3") +
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"
+  )
+```
 
 
+```{r}
+#| label: tbl-mult1
+#| tbl-cap: Analyse multivariée
+#| eval: false
+
+lm(delai ~ motif_appel + ton_appel + sexe + experience + periode, data = tt) |>
+  tbl_regression() |>
+  bold_labels() |>
+  pexptabph(
+    nomfich = classeur,
+    nomsheet = "mult1",
+    exp = expx,
+    lg = TRUE
+  )
+```
+
+
+# Objectifs secondaires
+
+Les objectifs secondaires autres sont regroupés dans les deux tableaux de la partie description :  un descriptif de la population & de l'appel (@tbl-appel1), l'autre reprenant les délais (@tbl-delai1).
+
+## Objectif 2 & 3
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\begin{tcolorbox}[colback=novo!5,
+                  colframe=novo]
+Recueil de tout ce qui est dit par le témoin permettant de mettre
+en évidence l’arrêt cardiaque ou rallongeant la détection de l’arrêt cardiaque
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
+
+L'analyse ne porte pas sur les mots au sens strict mais sur les racines des mots (pour éviter les conjugaisons, accords, etc.). C’est pour ça que les mots paraissent tronqués.
+
+```{r}
+#| label: préparation textes
+
+fav <-   pivot_longer(tt, cols = starts_with("temoin"), names_to = "faveur", values_to = "texte") |> 
+  tidytext::unnest_tokens(output="mots",
+                          input=texte,
+                          token="ngrams",
+                          n=1) |> 
+   anti_join(proustr::proust_stopwords(),by=c("mots"="word")) |> 
+  pr_stem_words(mots) |> 
+  dplyr::filter(!mots %in%c("n'est", "j'ai", "qu'el", "qu'il", "oui"))
+
+```
+
+## En faveur d'un ACR
+
+```{r}
+#| label: tbl-fav1
+#| tbl-cap: Mots en faveurs d'un ACR
+
+zz <- fav |>
+  mutate(mots = as.factor(mots)) |> 
+  dplyr::filter(faveur == "temoin_faveur_acr") 
+
+zz$mots <- fct_lump_prop(zz$mots, prop = .03) 
+zz$mots <- fct_infreq(zz$mots) 
+  
+
+zz |> 
+  dplyr::filter(mots != "Other") |> 
+  mutate(mots = factor(mots)) |> 
+  dplyr::select(mots) |>
+  tbl_summary() |>
+    bold_labels() |>
+  modify_header(label ~ "") |>
+  pexptabph(
+    nomfich = classeur,
+    nomsheet = "fav1",
+    exp = expx,
+    lg = TRUE)
+
+```
+
+
+```{r}
+#| label: fig-wordfav
+#| fig-cap: Mots en faveurs d'un ACR
+
+zz <- fav |>
+  dplyr::filter(faveur == "temoin_faveur_acr") |> 
+  count(mots, sort = TRUE) 
+
+  ggplot(zz, aes(label = mots, size= n, color = n)) +
+   geom_text_wordcloud(grid_size = 2,area_corr = FALSE) +
+  theme_minimal()+
+  scale_color_gradient(low = "red", high = "forestgreen")
+```
+
+## En défaveur d'un ACR
+
+```{r}
+#| label: tbl-dfav1
+#| tbl-cap: Mots en défaveurs d'un ACR
+
+zz <- fav |>
+  mutate(mots = as.factor(mots)) |> 
+  dplyr::filter(faveur == "temoin_defaveur_acr") 
+
+zz$mots <- fct_lump_prop(zz$mots, prop = .03) 
+zz$mots <- fct_infreq(zz$mots) 
+  
+
+zz |> 
+  dplyr::filter(mots != "Other") |> 
+  mutate(mots = factor(mots)) |> 
+  dplyr::select(mots) |>
+  tbl_summary() |>
+      bold_labels() |>
+  modify_header(label ~ "") |>pexptabph(
+    nomfich = classeur,
+    nomsheet = "dfav1",
+    exp = expx,
+    lg = TRUE)
+
+```
+
+
+```{r}
+#| label: fig-worddfav
+#| fig-cap: Mots en défaveurs d'un ACR
+
+zz <- fav |>
+  dplyr::filter(faveur == "temoin_defaveur_acr") |> 
+  count(mots, sort = TRUE) 
+
+  ggplot(zz, aes(label = mots, size= n, color = n)) +
+   geom_text_wordcloud(grid_size = 2,area_corr = FALSE) +
+  theme_minimal()+
+  scale_color_gradient(low = "red", high = "forestgreen")
+```
+
+Les mots respire, respiration\dots sont largement les plus souvent cités dans les deux cas.
+
+\appendix
 
 # Technique 
 
-L'analyse statistique sera réalisée avec le logiciel **R**[@rstat] & divers packages. Outre ceux cités dans le texte ou utilisera en particulier `tidyverse` [@tidy] & `baseph` [@baseph].
 
-Un dépôt GitHub sera utilisé qui ne comprendra que le code & non les données ou résultats. Au besoin un faux tableau de données sera présenté pour permettre des tests.
+Le risque $\alpha$ retenu est de 0,05 & la puissance de 0,8.
 
-<https://github.com/philippemichel/acr_90/>
+VU l'effectif aucune hypothèse de normalité n'a pu être faite. Les données discrètes sont présentées en pourcentage puis comparées par le test du $\Chi^2$ de Pearson avec correction de Yates si nécessaire. Les données numériques ont été présentées par leur médiane & les quartiles.
 
-#\printglossary[type=\glsxtrabbrvtype, title={Abbrévations}]
+L'analyse statistique a été réalisée avec le logiciel **R**[@rstat] & divers packages en particulier `tidyverse` [@tidy] & `baseph` [@baseph].
+
+L'analyse du texte a été faite après préparation des données en extrayant pour chaque mot sa racine (ou lemme) puis en excluant les mots *vides* (pronoms, auxillaires\dots)\footnote{Le corpus de référence est \emph{À la recherche du temps perdu} !}.
+
+Un dépôt GitHub est utilisé qui ne comprend que le code & non les données ou résultats. Au besoin un faux tableau de données sera présenté pour permettre des tests.
+
+<https://gitlab.com/uscr/acr90/>
+
+\printglossary[type=\glsxtrabbrvtype, title={Abbrévations}]
 
 \addcontentsline{toc}{chapter}{Bibliographie}
