@@ -14,7 +14,7 @@ estimée de 4 mois.
 # Fichiers
 
 - `acr90_plan_analyse.qmd` : Plan d'analyse (un peu vieillot)
-- `rapport.md` : Rapport statistique
+- `rapport.md` : Rapport statistique (contient de l'analyse de texte avec nuage de mots)
 - `import.R` : Macro d'import & de mise en forme des données
 - `_quarto.yml` : En-tête (Yaml & $\LaTeX$) pour les documents
 
