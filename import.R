@@ -49,6 +49,3 @@ importph <- function() {
 
 importph()
 load(file = "datas/acr90.RData")
-
-
-

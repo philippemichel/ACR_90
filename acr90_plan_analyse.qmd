@@ -1,34 +1,8 @@
 ---
-title: "ACR90"
 subtitle: "Plan d'analyse"
-thanks: "Ariane GILLET, Clélia DELETTRE - SAMU 95"
-author: "Philippe MICHEL"
-date: 08/09/2022
-format: pdf
-pdf-engine: lualatex
-documentclass: scrartcl
-mainfont: Adobe Garamond Pro
-mainfontoptions:
-- Ligatures = Common
-- Ligatures = Rare
-sansfont: Trajan Pro
-monofont: Source Sans Pro
-mathfont: Source Sans Pro
-monofontoptions: Numbers = Monospaced
-mathfontoptions: Numbers = Monospaced
-colorlinks: true
-fontsize: 10pt
-papersize: a4
-lang: fr
-fig-align: center
 toc: false
-lof: false
 lot: false
-cite-method: biblatex
-bibliography: stat.bib
-license: MIT
-always_allow_html: true
-keep-tex: true
+lof: false
 ---
 
 ```{r setup, include=FALSE}
@@ -37,17 +11,26 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = FA
 
 Ce document ne concerne que l'analyse statistique des données.
 
-Il s'agit d'une étude purement observationnelle. Le risque $\alpha$ retenu est de 0,05 *&* la puissance de 0,8. Des graphiques seront réalisés pour tous les résultats intéressants. Le nombre de sujets nécessaire a été évalué à 74.
+Il s'agit d'une étude purement observationnelle. Le risque $\alpha$ retenu est de 0,05 *&* la puissance de 0,8. Des graphiques seront réalisés pour tous les résultats intéressants. Le nombre de sujets nécessaire a été évalué à 74 (étude purement descriptive, risque d’erreur acceptable réglé à 10 %).  Vu la taille de l'échantillon l'hypothèse de normalité ne peut être retenue.
+
+
+
+## Méthode de prise en compte des données manquantes ou non valides
+
+
+Le décompte des données manquantes sera réalisé & présenté par un tableau ou un graphique. Les données manquantes seront imputées (\glspl{imput} multiples, 150 itérations au maximum --- package `missMDA`[@miss]) si considérées comme manquant de manière complètement aléatoire (`MCAR`) ou manquant de manière aléatoire (`MAR`) sauf pour le critère principal (temps) pour lequel dles cas avec cette donnée manquante seront supprimés de l'étude.
 
 ## Description de la population
 
-La description de la population sera présentée sur un tableau avec toutes les données démographiques concernant le patient *&* l'appel (qui appelle, d'où etc.)
+La description de la population sera présentée par un tableau avec toutes les données démographiques concernant le patient *&* l'appel (qui appelle, d'où etc.)
 
 Les données numériques seront présentées par leur médiane avec les quartiles, les données catégorielles par le nombre *&* le pourcentage avec son intervalle de confiance calculé par bootstrap.
 
+Une analyse factorielle en \glspl{mca} sera tentée afin d'essayer de définir des profils-type des appels (packages `FactoMineR`[@facto] *&* `factoextra`[@factoextra]). 
+
 ## Objectif principal
 
-L'objectif principal est de détermier le temps entre le décroché *&* l'identification de l'ACR.  Ce temps sera calculé à partir des données enregistrées par le système de téléphonie du SAMU *&* présenté par sa médiane *&* les quartiles. 
+L'objectif principal est de déterminer le temps entre le décroché *&* l'identification de l'ACR.  Ce temps sera calculé à partir des données enregistrées par le système de téléphonie du SAMU *&* présenté par sa médiane *&* les quartiles. 
 
 Un lien entre les données concernant l'appel ou l'expérience de l'ARM *&* ce temps sera réalisé par des tests du $\chi^2$ pour les variables discrètes *&* des tests de Wilcoxon pour les données numériques. Une analyse multivariée par régression linéaire sera ensuite réalisée en incorporant dans un premier temps incorporant les toutes les variables ayant une p-value \< 0,20 sur l'analyse monovariée. Une recherche du meilleur modèle sera ensuite réalisé par un step-by-step descendant. Pour la détermination du meilleur modèle de régression logistique par step-by-step sur le critère principal, on utilisera un jeu de données après imputation des données manquantes. Par contre, une fois le modèle retenu, les calculs présentés seront réalisés sur les données réelles.
 
@@ -57,7 +40,7 @@ Un lien entre les données concernant l'appel ou l'expérience de l'ARM *&* ce t
 
  L'investigateur extraira des bandes les données concernées  *&* une liste sera constituée. La description sera présentée par le nombre *&* le pourcentage avec son intervalle de confiance calculé par bootstrap.
  
-Une analyse en plein texte de l'entretien téléphonique centrée sur les déclarations de l’appelant sera réalisée sur un petit échantillon de 20 cas environ après lemmatisation par analyse factorielle *&* graphique (nuage de mots).
+Une analyse en plein texte de l'entretien téléphonique centrée sur les déclarations de l’appelant sera réalisée sur un petit échantillon de 20 cas environ après lemmatisation par analyse factorielle *&* graphique (nuage de mots --- package `tidytext`[tidytext]).
 
 ### Temps de recherche d'un DAE ou de proposition d'un MCE au témoin.
 
@@ -69,5 +52,9 @@ Le ton de l'appel sera noté selon une échelle de Likert *à définir*. Une des
 
 ## technique
 
-L'analyse statistique sera réalisée grâce au logiciel `R` [@rstat] *&* à divers packages en particulier `tidyverse`[@tidy], `FactoMineR`[@facto] *&* `epiDisplay`[@epid].
+L'analyse statistique sera réalisée grâce au logiciel `R` [@rstat] *&* à divers packages en particulier , `baseph`[@baseph] `tidyverse`[@tidy]l *&* `epiDisplay`[@epid].
+
+Un dépôt GitHub sera utilisé qui ne comprendra que le code & non les données ou résultats. Au besoin un faux tableau de données sera présenté pour permettre des tests.
+
+<https://github.com/philippemichel/ACR_90>
 
