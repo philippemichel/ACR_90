@@ -14,7 +14,7 @@ estimée de 4 mois (plus de 50 cas).
 # Fichiers
 
 - `acr90_plan_analyse.qmd` : Plan d'analyse réécrit
-- `rapport.md` : Rapport statistique (contient de l'analyse de texte avec nuage de mots)
+- `rapport2.md` : Rapport statistique sur population complète (contient de l'analyse de texte avec nuage de mots)
 - `import.R` : Macro d'import & de mise en forme des données
 - `_quarto.yml` : En-tête (Yaml & $\LaTeX$) pour les documents
 

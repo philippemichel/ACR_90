@@ -1,0 +1,107 @@
+---
+subtitle: "Rapport statistique V2.0"
+---
+
+```{r}
+#| label: setup
+
+rm(list = ls())
+#
+library(baseph)
+library(janitor)
+library(tidyverse)
+library(gtsummary)
+library(kableExtra)
+library(lubridate)
+library(kableExtra)
+library(forestmodel)
+library(labelled)
+library(epiDisplay)
+library(visdat)
+library(GGally)
+library(ggridges)
+library(colorspace)
+#library(xlsx)
+library(apyramid)
+library(plotly)
+#
+theme_gtsummary_language(language = "fr", decimal.mark = ",")
+options(OutDec = ",")
+#
+load("datas/acr90.RData")
+expx <- FALSE
+classeur <- "acr90.xlxs"
+if (expx){system(paste0("rm -f ",classeur))}
+#
+cat <- list(all_continuous() ~ "wilcox.test", all_categorical() ~ "chisq.test")
+affl <- list(all_categorical()~"{n}/{N} ({p})")
+```
+
+
+# Description de la population
+
+
+
+
+L'échantillon comporte `r nrow(tt)` cas.
+
+## Données manquantes
+
+```{r}
+#| label: fig-manq
+#| fig-cap: Données manquantes
+#| fig-asp: 0.8
+
+vis_dat(tt)
+```
+
+L'échantillon comporte peu de données manquantes.
+
+## Patient
+
+```{r}
+#| label: tbl-pat
+#| tbl-cap: Patient
+
+tt |> 
+dplyr::select(sexe, age) |> 
+ tbl_summary(missing = "no") |> 
+   bold_labels() |> 
+   modify_header(label ~ " ") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "pat", lg = TRUE) 
+```
+
+```{r}
+#| label: fig-pyr
+#| fig-cap: Pyramide des âges
+
+pyramid(tt$age, tt$sexe, col.gender = c("pink", "lightblue"), main = "Pyramide des âges",binwidth = 10)
+```
+
+## Appel
+
+```{r}
+#| label: tbl-appel
+#| tbl-cap: Appel
+
+tt |> 
+dplyr::select(motif_de_lappel:ton_appel, lien:sexe_de_lappelant,horaire_3_huit) |> 
+ tbl_summary(missing = "no") |> 
+   bold_labels() |> 
+   modify_header(label ~ " ") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "appel", lg = TRUE) 
+```
+
+## ARM
+
+```{r}
+#| label: tbl-arm
+#| tbl-cap: ARM
+
+tt |> 
+dplyr::select(sexe_arm:experience_arm) |> 
+ tbl_summary(missing = "no") |> 
+   bold_labels() |> 
+   modify_header(label ~ " ") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "arm", lg = TRUE) 
+```
