@@ -29,7 +29,8 @@ importph <- function() {
       en_faveur_acr = donnees_du_temoin_en_faveur_acr,
       en_defaveur_acr = donnees_du_temoin_en_defaveur_acr,
       delai_dae = delai_demande_dae,
-      lien_appelant_patient = lien_entre_lappelant_et_le_patient
+      lien_appelant_patient = lien_entre_lappelant_et_le_patient,
+      delai_reconnaissance = delai_decrochage_reconnaissance_acr
     ) |>
     mutate(age = as.numeric(age)) |>
     mutate(across(where(is.character), as.factor)) |>

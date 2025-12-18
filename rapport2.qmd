@@ -11,8 +11,12 @@ library(baseph)
 library(janitor)
 library(tidyverse)
 library(gtsummary)
+library(ggsci)
 library(kableExtra)
 library(lubridate)
+library(factoextra)
+library(missMDA)
+library(FactoMineR)
 library(kableExtra)
 library(forestmodel)
 library(labelled)
@@ -33,8 +37,14 @@ expx <- FALSE
 classeur <- "acr90.xlxs"
 if (expx){system(paste0("rm -f ",classeur))}
 #
-cat <- list(all_continuous() ~ "wilcox.test", all_categorical() ~ "chisq.test")
-affl <- list(all_categorical()~"{n}/{N} ({p})")
+theme_gtsummary_language(language = "fr", decimal.mark = ",")
+theme_gtsummary_journal(journal = "jama")
+options(OutDec = ",")
+ptest <- list(all_continuous() ~ "wilcox.test", all_categorical() ~ "chisq.test")
+stt <- list(
+  all_continuous() ~ "{median} ({p25}, {p75})"
+  all_categorical() ~ "{n}/{N} ({p}%)"
+)
 ```
 
 
@@ -65,7 +75,8 @@ L'échantillon comporte peu de données manquantes.
 
 tt |> 
 dplyr::select(sexe, age) |> 
- tbl_summary(missing = "no") |> 
+ tbl_summary(missing = "no",
+              statistic = stt) |> 
    bold_labels() |> 
    modify_header(label ~ " ") |>
   pexptabph(exp = expx, nomfich = classeur , nomsheet = "pat", lg = TRUE) 
@@ -80,13 +91,16 @@ pyramid(tt$age, tt$sexe, col.gender = c("pink", "lightblue"), main = "Pyramide d
 
 ## Appel
 
+\label{tbl-appel}
+
 ```{r}
 #| label: tbl-appel
 #| tbl-cap: Appel
 
 tt |> 
 dplyr::select(motif_de_lappel:ton_appel, lien:sexe_de_lappelant,horaire_3_huit) |> 
- tbl_summary(missing = "no") |> 
+ tbl_summary(missing = "no",
+              statistic = stt) |> 
    bold_labels() |> 
    modify_header(label ~ " ") |>
   pexptabph(exp = expx, nomfich = classeur , nomsheet = "appel", lg = TRUE) 
@@ -100,8 +114,237 @@ dplyr::select(motif_de_lappel:ton_appel, lien:sexe_de_lappelant,horaire_3_huit) 
 
 tt |> 
 dplyr::select(sexe_arm:experience_arm) |> 
- tbl_summary(missing = "no") |> 
+ tbl_summary(missing = "no",
+              statistic = stt) |> 
    bold_labels() |> 
    modify_header(label ~ " ") |>
   pexptabph(exp = expx, nomfich = classeur , nomsheet = "arm", lg = TRUE) 
 ```
+
+# Critère principal
+*Temps en secondes entre le décrochage de l’appel et la reconnaissance de l’arrêt cardiaque par l’assistant de régulation médicale*
+
+```{r}
+#| label: imput1
+#| eval: false
+nn <- tt |> 
+  dplyr::select(-c(patient, horaire_de_lappel)) |> 
+  missMDA::estim_ncpFAMD()
+nn <- nn$ncp
+```
+
+```{r}
+#| label: imput2
+
+tt <- tt |> 
+  mutate(age = cut(age, breaks = c(0, 20, 40, 60, 80, 100), right = FALSE))
+var_label(tt$age) <- "Âge du patient"
+
+
+nn <- 5
+tti <- tt |> 
+  dplyr::select(-c(patient, horaire_de_lappel)) 
+zz <- imputeFAMD(tti,ncp = nn)
+tti <- zz$completeObs
+```
+
+```{r}
+#| label: tbl-princ1
+#| tbl-cap: Délai décrochage/reconnaissance de l'ACR
+
+tt |> 
+  dplyr::select(delai_reconnaissance) |>
+  tbl_summary(
+    type = all_continuous() ~ "continuous2",
+    statistic = all_continuous() ~ c(
+      "{median} ({p25}, {p75})",
+      "{mean} ± {sd}",
+      "{min}, {max}"
+    ),
+    missing = "no"
+  ) |> 
+     bold_labels() |> 
+   modify_header(label ~ "Temps en secondes") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "delai1", lg = TRUE) 
+```
+
+```{r}
+#| label: fig-princ1a
+#| fig-cap: Délai décrochage/reconnaissance de l'ACR
+
+tt |> 
+  ggplot(aes(x = delai_reconnaissance)) +
+  geom_histogram(binwidth = 20, fill = "lightblue", color = "black") +
+  labs(
+    title = "Délai entre le décrochage et la reconnaissance de l'ACR",
+    x = "Temps en secondes",
+    y = "Nombre de cas"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: fig-princ1b
+#| fig-cap: Délai décrochage/reconnaissance de l'ACR
+
+tt |> 
+  ggplot(aes(x = 1, y = delai_reconnaissance)) +
+  geom_violin(fill = "lightblue") +
+  geom_boxplot(width = 0.2, fill = "grey90") +
+  labs(
+    title = "Délai entre le décrochage et la reconnaissance de l'ACR",
+    y = "secondes",
+    caption = ""
+  ) +
+  theme_light() +
+    scale_y_continuous(breaks = seq(0,600,60), labels =  seq(0,600,60)) +
+  scale_fill_jama() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_blank(),
+    legend.title = element_text(size = 12),
+    axis.title.y = element_text(
+      size = 12,
+      angle = 90,
+      vjust = .5
+    ),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"
+  )
+```
+
+# Facteurs influants
+
+```{r}
+#| label: tbl-facteurs1
+#| tbl-cap: Analyse univariée des facteurs influant sur le délai de reconnaissance de l'ACR
+
+
+tt |> 
+  dplyr::  select(delai_reconnaissance:motif_de_lappel,ton_appel:sexe_de_lappelant, horaire_3_huit) |> 
+  tbl_continuous(variable = delai_reconnaissance) |> 
+  add_p() |> 
+       bold_labels() |> 
+   modify_header(label ~ "Temps en secondes") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "factreco", lg = TRUE) 
+              
+                 
+```
+
+Les femmes sont plus convaincantes que les hommes pour faire reconnaître un ACR.
+
+```{r}
+#| label: fig-princ1reg
+#| fig-cap: Délai décrochage/reconnaissance de l'ACR -- Régression
+
+lm(delai_reconnaissance ~  motif_de_lappel + ton_appel + sexe_arm +  sexe_de_lappelant + horaire_3_huit, data = tt) |> 
+  forest_model(format_options = list(text_size = 2)) 
+
+```
+
+Il vaut mieux appeler pour une noyade & être une femme.
+
+# Critères secondaires
+
+## Critère 1
+*Motif de l’appel initial*
+voir tableau **Appel** (\ref{tbl-appel}).
+
+## Critères 2 & 3
+
+*Recueil de tout ce qui est dit par le témoin permettant de mettre en évidence ou rallongeant la détection de l’arrêt cardiaque.*
+
+## Critère 4
+*Temps en secondes avant la demande de recherche d’un DAE au témoin.*
+
+Un DAE a été demandé uniquement pour un cas. 
+
+## Critère 5
+*Temps en secondes avant l’initiation d’un massage cardiaque externe.*
+
+```{r}
+#| label: tbl-initmce
+#| tbl-cap: cc
+
+tt |> 
+  dplyr::select(delai_mce) |>
+  tbl_summary(
+    type = all_continuous() ~ "continuous2",
+    statistic = all_continuous() ~ c(
+      "{median} ({p25}, {p75})",
+      "{mean} ± {sd}",
+      "{min}, {max}"
+    ),
+    missing = "no"
+  ) |> 
+     bold_labels() |> 
+   modify_header(label ~ "Temps en secondes") |>
+  pexptabph(exp = expx, nomfich = classeur , nomsheet = "initmce", lg = TRUE) 
+```
+
+```{r}
+#| label: fig-initmce1
+#| fig-cap: Temps avant l’initiation d’un massage cardiaque externe
+
+tt |> 
+  ggplot(aes(x = delai_mce)) +
+  geom_histogram(binwidth = 20, fill = "lightblue", color = "black") +
+  labs(
+    title = "Temps avant l’initiation d’un massage cardiaque externe",
+    x = "Temps en secondes",
+    y = "Nombre de cas",
+    caption = ""
+  ) +
+  theme_light() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    axis.title.y = element_text(
+      size = 12,
+      angle = 90,
+      vjust = .5
+    ),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"
+  )
+```
+
+```{r}
+#| label: fig-pinitmce2
+#| fig-cap: Temps avant l’initiation d’un massage cardiaque externe
+
+tt |> 
+  ggplot(aes(x = 1, y = delai_reconnaissance)) +
+  geom_violin(fill = "lightblue") +
+  geom_boxplot(width = 0.2, fill = "grey90") +
+  labs(
+    title = "Temps avant l’initiation d’un massage cardiaque externe",
+    y = "secondes",
+    caption = ""
+  ) +
+  theme_light() +
+    scale_y_continuous(breaks = seq(0,600,60), labels =  seq(0,600,60)) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_blank(),
+    legend.title = element_text(size = 12),
+    axis.title.y = element_text(
+      size = 12,
+      angle = 90,
+      vjust = .5
+    ),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"
+  )
+```
+
+## Critères 6 & 7
+
+Voir tableau **Appel** (\ref{tbl-appel}).
