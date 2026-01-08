@@ -23,26 +23,31 @@ library(labelled)
 library(epiDisplay)
 library(visdat)
 library(GGally)
-library(ggridges)
+library(tidytext)
 library(colorspace)
 #library(xlsx)
 library(apyramid)
 library(plotly)
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+library(readODS)
 #
 theme_gtsummary_language(language = "fr", decimal.mark = ",")
 options(OutDec = ",")
 #
 load("datas/acr90.RData")
-expx <- FALSE
-classeur <- "acr90.xlxs"
-if (expx){system(paste0("rm -f ",classeur))}
+expx <- TRUE
+classeur <- "acr90.ods"
+#if (expx){system(paste0("rm -f ",classeur))}
 #
 theme_gtsummary_language(language = "fr", decimal.mark = ",")
 theme_gtsummary_journal(journal = "jama")
 options(OutDec = ",")
 ptest <- list(all_continuous() ~ "wilcox.test", all_categorical() ~ "chisq.test")
 stt <- list(
-  all_continuous() ~ "{median} ({p25}, {p75})"
+  all_continuous() ~ "{median} ({p25}, {p75})",
   all_categorical() ~ "{n}/{N} ({p}%)"
 )
 ```
@@ -204,7 +209,7 @@ tt |>
     plot.subtitle = element_text(size = 12),
     axis.title.x = element_blank(),
     legend.title = element_text(size = 12),
-    axis.title.y = element_text(
+    axis.title.y = element_text(,
       size = 12,
       angle = 90,
       vjust = .5
@@ -246,6 +251,34 @@ lm(delai_reconnaissance ~  motif_de_lappel + ton_appel + sexe_arm +  sexe_de_lap
 
 Il vaut mieux appeler pour une noyade & être une femme.
 
+# Analyse factorielle
+
+```{r}
+ttn <- tti |> 
+  dplyr::select(- delai_mce, -lien) |> 
+  MCA(quali.sup = "delai_reconnaissance", graph = FALSE)
+```
+
+```{r}
+#| label: fig-factcas
+#| tbl-cap: Regroupement selon le sexe de l'appelant
+
+ttn |> 
+  fviz_mca_ind( habillage = "sexe_de_lappelant",geom = "point", addEllipses = TRUE)
+
+```
+
+
+```{r}
+#| label: fig-factvar
+#| tbl-cap: Analyse des variables
+
+ttn |> 
+  fviz_mca_var(repel = TRUE, select.var = list(cos2 = 20),col.var = "cos2")
+```
+
+On ne met pas en évidence de groupe bien franc (effectif très faible). Seul le groupe *traumatisme sur la voie publique* semble se distinguer. 
+
 # Critères secondaires
 
 ## Critère 1
@@ -255,6 +288,105 @@ voir tableau **Appel** (\ref{tbl-appel}).
 ## Critères 2 & 3
 
 *Recueil de tout ce qui est dit par le témoin permettant de mettre en évidence ou rallongeant la détection de l’arrêt cardiaque.*
+
+```{r}
+#| label: macro-txt
+
+dtxt <- function(x){
+docs <- Corpus(VectorSource(txt))
+#
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords("french"))
+docs <- tm_map(docs, removeWords, c("a", "plus", "oui", "ça", "tout", "enfant", "aà", "peu")) 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, stripWhitespace)
+dtm <- TermDocumentMatrix(docs)
+return(dtm)
+}
+```
+
+
+L'analyse du texte est limitée par la taille des textes. 
+
+On analyse principalement la fréquence des mots (ou plutôt des racines). Volontairement les négations ne sont pas prises en compte : *respire* à la même signification & le même poids que *ne respire pas*.
+
+## Termes en faveur d'un ACR
+
+```{r}
+#| label: fig-wordacrplus
+#| fig-cap: Nuage de mots en faveur d'un ACR
+
+txt <- readLines(con = "datas/faveur.txt", encoding = "UTF-8")
+dtm <- dtxt(txt)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+dp<- data.frame(word = names(v),freq=v)
+#
+set.seed(1234)
+wordcloud(words = dp$word, freq = dp$freq, min.freq = 2,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+```{r}
+#| label: tbl-txtav
+#| tbl-cap: Mots en faveur d'un ACR
+
+zz <- dp |> 
+  filter(freq >= 3)
+names(zz) <- c("Racine", "Fréquence")
+  zz |> 
+     as_tibble() |>
+    kbl(booktabs = TRUE)|> 
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+    if (expx) {
+      zz |>
+        write_ods(path = classeur, sheet = "faveur", append = TRUE)
+    }
+
+```
+
+## Termes en défaveur d'un ACR
+
+```{r}
+#| label: fig-wordacrmoins
+#| fig-cap: Nuage de mots en défaveur d'un ACR
+
+txt <- readLines(con = "datas/defaveur.txt", encoding = "UTF-8")
+dtm <- dtxt(txt)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+dm <- data.frame(word = names(v),freq=v)
+#
+set.seed(1234)
+wordcloud(words = dm$word, freq = dm$freq, min.freq = 2,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+
+```{r}
+#| label: tbl-txtdef
+#| tbl-cap: Mots en défaveur d'un ACR
+
+zz <- dm |> 
+  filter(freq >= 2)
+names(zz) <- c("Racine", "Fréquence")
+  zz |> 
+     as_tibble() |>
+    kbl(booktabs = TRUE)|> 
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+    if (expx) {
+      zz |>
+        write_ods(path = classeur, sheet = "defaveur", append = TRUE)
+    }
+
+```
+
+
 
 ## Critère 4
 *Temps en secondes avant la demande de recherche d’un DAE au témoin.*
@@ -348,3 +480,10 @@ tt |>
 ## Critères 6 & 7
 
 Voir tableau **Appel** (\ref{tbl-appel}).
+
+
+# Technique
+Les données démographiques on été décrites par la médiane & les quartiles pour les données numériques, en pourcentage pour les données catégorielles. 
+Pour la recherche de facteurs influants on a utilisé  le test de Wilcoxon-Mann-Whitney pour les données binaires ou un test de Kruskal-Wallis. L'analyse multivariée a été réalisée en régression linéaire après imputation des données manquantes. Une recherche du meilleur modèle a été réalisée en step-by-step descendant. 
+
+L'analyse statistique a été réalisée grâce au logiciel **R**[@rstat].
