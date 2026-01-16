@@ -25,7 +25,6 @@ library(visdat)
 library(GGally)
 library(tidytext)
 library(colorspace)
-#library(xlsx)
 library(apyramid)
 library(plotly)
 library("tm")
@@ -38,7 +37,7 @@ theme_gtsummary_language(language = "fr", decimal.mark = ",")
 options(OutDec = ",")
 #
 load("datas/acr90.RData")
-expx <- TRUE
+expx <- FALSE
 classeur <- "acr90.ods"
 #if (expx){system(paste0("rm -f ",classeur))}
 #
@@ -329,6 +328,7 @@ wordcloud(words = dp$word, freq = dp$freq, min.freq = 2,
           colors=brewer.pal(8, "Dark2"))
 ```
 
+
 ```{r}
 #| label: tbl-txtav
 #| tbl-cap: Mots en faveur d'un ACR
@@ -386,6 +386,52 @@ names(zz) <- c("Racine", "Fréquence")
 
 ```
 
+```{r}
+#| label: mots
+#| fig-cap: Mots (racines)notés en faveur ou en défaveur d'un ACR
+
+txt <- readLines(con = "datas/acr.txt", encoding = "UTF-8")
+dtm <- dtxt(txt)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+dp<- data.frame(word = names(v),freq=v)
+#
+set.seed(1234)
+wordcloud(words = dp$word, freq = dp$freq, min.freq = 2,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+
+dd <- as_tibble(dp) |> 
+rename(freqn= freq) 
+dd |> 
+  dplyr::filter(freqn > 2) |>
+  ggplot() +
+  aes(x = reorder(word,freqn,decreasing = TRUE), y = freqn ) +
+  geom_col(aes(fill =freqn)) +
+  labs(
+    title = "Mots Notés",
+    x = "Mots",
+    y = "N",
+    caption = "Mots (racines)notés en faveur ou en défaveur d'un ACR"
+  ) +
+  theme_light() +
+  scale_fill_material() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    axis.title.y = element_text(
+      size = 12,
+      angle = 90,
+      vjust = .5
+    ),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"
+  )
+```
+
 
 
 ## Critère 4
@@ -398,7 +444,7 @@ Un DAE a été demandé uniquement pour un cas.
 
 ```{r}
 #| label: tbl-initmce
-#| tbl-cap: cc
+#| tbl-cap: Temps avant l’initiation d’un massage cardiaque externe
 
 tt |> 
   dplyr::select(delai_mce) |>
@@ -418,16 +464,16 @@ tt |>
 
 ```{r}
 #| label: fig-initmce1
-#| fig-cap: Temps avant l’initiation d’un massage cardiaque externe
+#| fig-cap: Temps avant l’initiation d’un MCE
 
 tt |> 
   ggplot(aes(x = delai_mce)) +
   geom_histogram(binwidth = 20, fill = "lightblue", color = "black") +
   labs(
-    title = "Temps avant l’initiation d’un massage cardiaque externe",
+    title = "Temps avant l’initiation d’un MCE",
     x = "Temps en secondes",
     y = "Nombre de cas",
-    caption = ""
+    caption = "MCE : Massage Cardiaque Externe"
   ) +
   theme_light() +
   theme(
@@ -448,16 +494,16 @@ tt |>
 
 ```{r}
 #| label: fig-pinitmce2
-#| fig-cap: Temps avant l’initiation d’un massage cardiaque externe
+#| fig-cap: Temps avant l’initiation d’un MCE
 
 tt |> 
   ggplot(aes(x = 1, y = delai_reconnaissance)) +
   geom_violin(fill = "lightblue") +
   geom_boxplot(width = 0.2, fill = "grey90") +
   labs(
-    title = "Temps avant l’initiation d’un massage cardiaque externe",
+    title = "Temps avant l’initiation d’un MCE",
     y = "secondes",
-    caption = ""
+    caption = "MCE : Massage Cardiaque Externe"
   ) +
   theme_light() +
     scale_y_continuous(breaks = seq(0,600,60), labels =  seq(0,600,60)) +
