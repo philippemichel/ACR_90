@@ -1,5 +1,5 @@
 ---
-subtitle: "Rapport statistique V2.0"
+subtitle: "Rapport statistique V2.1"
 ---
 
 ```{r}
@@ -37,7 +37,7 @@ theme_gtsummary_language(language = "fr", decimal.mark = ",")
 options(OutDec = ",")
 #
 load("datas/acr90.RData")
-expx <- FALSE
+expx <- TRUE
 classeur <- "acr90.ods"
 #if (expx){system(paste0("rm -f ",classeur))}
 #
@@ -52,10 +52,23 @@ stt <- list(
 ```
 
 
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\begin{tcolorbox}[colback=novo!5,
+                  colframe=novo]
+\textbf{Nouveautés v2.1}
+
+\begin{itemize}
+\item Exclusion du cas de noyade
+\item Regroupement des \emph{traumatismes} (chutes lors du malaise) dans les malaises/inconscient.
+\item Analyse du délai de reconnaissance selon les recommandations (< 90sec)
+\item Compléments sur la technique statistique.
+\end{itemize}
+\end{tcolorbox}
+\end{minipage}
+\end{center}
+
 # Description de la population
-
-
-
 
 L'échantillon comporte `r nrow(tt)` cas.
 
@@ -112,6 +125,8 @@ dplyr::select(motif_de_lappel:ton_appel, lien:sexe_de_lappelant,horaire_3_huit) 
 
 ## ARM
 
+\label{tbl-arm}
+
 ```{r}
 #| label: tbl-arm
 #| tbl-cap: ARM
@@ -125,8 +140,8 @@ dplyr::select(sexe_arm:experience_arm) |>
   pexptabph(exp = expx, nomfich = classeur , nomsheet = "arm", lg = TRUE) 
 ```
 
-# Critère principal
-*Temps en secondes entre le décrochage de l’appel et la reconnaissance de l’arrêt cardiaque par l’assistant de régulation médicale*
+## Analyse factorielle
+
 
 ```{r}
 #| label: imput1
@@ -151,6 +166,37 @@ tti <- tt |>
 zz <- imputeFAMD(tti,ncp = nn)
 tti <- zz$completeObs
 ```
+
+```{r}
+ttn <- tti |> 
+  dplyr::select(- delai_mce, -lien) |> 
+  MCA(quali.sup = "delai_reconnaissance", graph = FALSE)
+```
+
+```{r}
+#| label: fig-factcas
+#| tbl-cap: Regroupement selon le sexe de l'appelant
+
+ttn |> 
+  fviz_mca_ind( habillage = "sexe_de_lappelant",geom = "point", addEllipses = TRUE)
+
+```
+
+
+```{r}
+#| label: fig-factvar
+#| tbl-cap: Analyse des variables
+
+ttn |> 
+  fviz_mca_var(repel = TRUE, select.var = list(cos2 = 20),col.var = "cos2")
+```
+
+On ne met pas en évidence de groupe bien franc (effectif très faible).
+
+# Critère principal
+*Temps en secondes entre le décrochage de l’appel et la reconnaissance de l’arrêt cardiaque par l’assistant de régulation médicale*
+
+## Résultat brut
 
 ```{r}
 #| label: tbl-princ1
@@ -178,20 +224,36 @@ tt |>
 
 tt |> 
   ggplot(aes(x = delai_reconnaissance)) +
-  geom_histogram(binwidth = 20, fill = "lightblue", color = "black") +
+  geom_histogram(binwidth = 30, aes(fill = delai90), color = "black") +
+  scale_x_continuous(breaks = seq(0, 460, 30), labels = seq(0, 460, 30)) +
   labs(
     title = "Délai entre le décrochage et la reconnaissance de l'ACR",
     x = "Temps en secondes",
     y = "Nombre de cas"
   ) +
-  theme_minimal()
+  theme_light() +
+  scale_fill_jama() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.title.x = element_blank(),
+    legend.title = element_text(size = 12),
+    axis.title.y = element_text(,
+      size = 12,
+      angle = 90,
+      vjust = .5
+    ),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 12),
+    legend.position = "top"
+  )
 ```
 
 ```{r}
 #| label: fig-princ1b
 #| fig-cap: Délai décrochage/reconnaissance de l'ACR
 
-tt |> 
+tt |>
   ggplot(aes(x = 1, y = delai_reconnaissance)) +
   geom_violin(fill = "lightblue") +
   geom_boxplot(width = 0.2, fill = "grey90") +
@@ -201,7 +263,7 @@ tt |>
     caption = ""
   ) +
   theme_light() +
-    scale_y_continuous(breaks = seq(0,600,60), labels =  seq(0,600,60)) +
+  scale_y_continuous(breaks = seq(0, 600, 60), labels = seq(0, 600, 60)) +
   scale_fill_jama() +
   theme(
     plot.title = element_text(size = 14, face = "bold"),
@@ -219,7 +281,28 @@ tt |>
   )
 ```
 
-# Facteurs influants
+## Conforme aux recommandations.
+
+Selon les recommandations actuelles le délai doit être inférieur à 90 secondes.
+
+```{r}
+#| label: tbl-reco
+#| tbl-cap: Conforme aux recommandation
+
+tt |>
+  dplyr::select(delai90) |>
+  tbl_summary(
+    missing = "no",
+    statistic = stt
+  ) |>
+  bold_labels() |>
+  modify_header(label ~ " ") |>
+  pexptabph(exp = expx, nomfich = classeur, nomsheet = "reco", lg = TRUE)
+
+```
+
+
+## Facteurs influants
 
 ```{r}
 #| label: tbl-facteurs1
@@ -237,7 +320,7 @@ tt |>
                  
 ```
 
-Les femmes sont plus convaincantes que les hommes pour faire reconnaître un ACR.
+
 
 ```{r}
 #| label: fig-princ1reg
@@ -248,35 +331,7 @@ lm(delai_reconnaissance ~  motif_de_lappel + ton_appel + sexe_arm +  sexe_de_lap
 
 ```
 
-Il vaut mieux appeler pour une noyade & être une femme.
-
-# Analyse factorielle
-
-```{r}
-ttn <- tti |> 
-  dplyr::select(- delai_mce, -lien) |> 
-  MCA(quali.sup = "delai_reconnaissance", graph = FALSE)
-```
-
-```{r}
-#| label: fig-factcas
-#| tbl-cap: Regroupement selon le sexe de l'appelant
-
-ttn |> 
-  fviz_mca_ind( habillage = "sexe_de_lappelant",geom = "point", addEllipses = TRUE)
-
-```
-
-
-```{r}
-#| label: fig-factvar
-#| tbl-cap: Analyse des variables
-
-ttn |> 
-  fviz_mca_var(repel = TRUE, select.var = list(cos2 = 20),col.var = "cos2")
-```
-
-On ne met pas en évidence de groupe bien franc (effectif très faible). Seul le groupe *traumatisme sur la voie publique* semble se distinguer. 
+Les femmes sont plus convaincantes que les hommes pour faire reconnaître un ACR. Les appels pour *inconscient/malaise* ont des temps de reconnaissance plus long ainsi que les appels en période 16 h - 0 h.
 
 # Critères secondaires
 
@@ -310,7 +365,7 @@ L'analyse du texte est limitée par la taille des textes.
 
 On analyse principalement la fréquence des mots (ou plutôt des racines). Volontairement les négations ne sont pas prises en compte : *respire* à la même signification & le même poids que *ne respire pas*.
 
-## Termes en faveur d'un ACR
+### Termes en faveur d'un ACR
 
 ```{r}
 #| label: fig-wordacrplus
@@ -348,7 +403,7 @@ names(zz) <- c("Racine", "Fréquence")
 
 ```
 
-## Termes en défaveur d'un ACR
+### Termes en défaveur d'un ACR
 
 ```{r}
 #| label: fig-wordacrmoins
@@ -386,36 +441,45 @@ names(zz) <- c("Racine", "Fréquence")
 
 ```
 
+### Mots notés en faveur ou en défaveur d'un ACR
+
 ```{r}
-#| label: mots
+#| label: fig-motsnuage
 #| fig-cap: Mots (racines)notés en faveur ou en défaveur d'un ACR
 
 txt <- readLines(con = "datas/acr.txt", encoding = "UTF-8")
 dtm <- dtxt(txt)
 m <- as.matrix(dtm)
 v <- sort(rowSums(m),decreasing=TRUE)
-dp<- data.frame(word = names(v),freq=v)
+dp<- data.frame(mots = names(v),freq=v)
 #
 set.seed(1234)
-wordcloud(words = dp$word, freq = dp$freq, min.freq = 2,
+wordcloud(words = dp$mots, freq = dp$freq, min.freq = 2,
           max.words=200, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 
-dd <- as_tibble(dp) |> 
-rename(freqn= freq) 
-dd |> 
-  dplyr::filter(freqn > 2) |>
-  ggplot() +
-  aes(x = reorder(word,freqn,decreasing = TRUE), y = freqn ) +
-  geom_col(aes(fill =freqn)) +
+```
+
+```{r}
+#| label: fig-motshisto
+#| fig-cap: Mots (racines)notés en faveur ou en défaveur d'un ACR
+txt <- readLines(con = "datas/acr.txt", encoding = "UTF-8")
+dtm <- dtxt(txt)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing = TRUE)
+tibble(mot = names(v),freq = v) |> 
+  dplyr::filter(freq > 2) |> 
+  ggplot()+
+  aes (x = reorder(mot, freq, decreasing = TRUE), y =,freq, fill = freq) +
+  geom_bar(stat = "identity") +
   labs(
     title = "Mots Notés",
     x = "Mots",
     y = "N",
-    caption = "Mots (racines)notés en faveur ou en défaveur d'un ACR"
+    caption = "Mots (racines) notés en faveur ou en défaveur d'un ACR"
   ) +
   theme_light() +
-  scale_fill_material() +
+# scale_fill_material() +
   theme(
     plot.title = element_text(size = 14, face = "bold"),
     plot.subtitle = element_text(size = 12),
@@ -465,10 +529,10 @@ tt |>
 ```{r}
 #| label: fig-initmce1
 #| fig-cap: Temps avant l’initiation d’un MCE
-
+#| 
 tt |> 
   ggplot(aes(x = delai_mce)) +
-  geom_histogram(binwidth = 20, fill = "lightblue", color = "black") +
+  geom_histogram(binwidth = 20, aes(fill = delai_mce), color = "black", na.rm = TRUE) +
   labs(
     title = "Temps avant l’initiation d’un MCE",
     x = "Temps en secondes",
@@ -476,6 +540,7 @@ tt |>
     caption = "MCE : Massage Cardiaque Externe"
   ) +
   theme_light() +
+ # scale_fill_material() +
   theme(
     plot.title = element_text(size = 14, face = "bold"),
     plot.subtitle = element_text(size = 12),
@@ -525,11 +590,21 @@ tt |>
 
 ## Critères 6 & 7
 
-Voir tableau **Appel** (\ref{tbl-appel}).
+Voir tableau **ARM** (\ref{tbl-arm}).
 
 
 # Technique
+
+Il s'agit d'une étude purement observationnelle. Le risque $\alpha$ retenu est de 0,05 *&* la puissance de 0,8. Des graphiques seront réalisés pour tous les résultats intéressants. Le nombre de sujets nécessaire a été évalué à 74 (étude purement descriptive, risque d’erreur acceptable réglé à 10 %). Vu la taille de l'échantillon l'hypothèse de normalité ne peut être retenue.
+
+ Les données manquantes ont été imputées (imputations multiples, 150 itérations au maximum) si considérées comme manquant de manière complètement aléatoire (`MCAR`) ou manquant de manière aléatoire (`MAR`).
+
 Les données démographiques on été décrites par la médiane & les quartiles pour les données numériques, en pourcentage pour les données catégorielles. 
-Pour la recherche de facteurs influants on a utilisé  le test de Wilcoxon-Mann-Whitney pour les données binaires ou un test de Kruskal-Wallis. L'analyse multivariée a été réalisée en régression linéaire après imputation des données manquantes. Une recherche du meilleur modèle a été réalisée en step-by-step descendant. 
+
+Pour la recherche de facteurs influants le test de Wilcoxon-Mann-Whitney a été utilisé pour les données binaires sinon un test de Kruskal-Wallis. L'analyse multivariée a été réalisée en régression linéaire après imputation des données manquantes. Une recherche du meilleur modèle a été réalisée en step-by-step descendant. 
+
+Une analyse factorielle en correspondances multiples a été tentée afin d'essayer de définir des profils-type d'appels.
+
+Une analyse en plein texte de l'entretien téléphonique centrée sur les déclarations de l’appelant a été réalisée  après lemmatisation.
 
 L'analyse statistique a été réalisée grâce au logiciel **R**[@rstat].

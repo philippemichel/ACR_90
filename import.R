@@ -37,8 +37,11 @@ importph <- function() {
     mutate(experience_arm = fct_relevel(
       experience_arm,
       "1-4 ans", "5-9 ans", ">10 ans"
-    ))
-  #
+    )) |>
+    mutate(delai90 = as.factor(ifelse(delai_reconnaissance < 91,
+      "< 90 sec", "> 90 sec"
+    )))
+
   bn <- c(
     "id", "Délai decrochage/ reconnaissance ACR", "Motif de l'appel", "En faveur d'un ACR", "En défaveur d'un ACR",
     "DAE", "Initiation du MCE",
@@ -47,7 +50,7 @@ importph <- function() {
     "Localisation du patient", "Sexe du patient", "Âge du patient",
     "Lien", "Lien entre l'appelant et le patient",
     "Sexe de l'appelant",
-    "Horaire", "Période de l'appel"
+    "Horaire", "Période de l'appel", "Délai de reconnaissance"
   )
   var_label(tt) <- bn
   faveur <- tt |>
